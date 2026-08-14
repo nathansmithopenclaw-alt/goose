@@ -45,25 +45,6 @@ pub struct RemoveSessionExtensionRequest {
     pub name: String,
 }
 
-/// Recreate the session's provider, keeping its current provider and model,
-/// so that the session's current extension list takes effect.
-///
-/// Useful after adding or removing session extensions when the provider
-/// forwards extensions to a downstream session (ACP harness providers such as
-/// claude-acp and codex-acp). Those providers snapshot the extension list when
-/// they are built, so extension changes only reach them on rebuild: the
-/// provider is replaced with a new instance whose downstream session is
-/// created with the updated extension list.
-///
-/// Providers that don't forward extensions pick up extension changes
-/// immediately; for them this call is not required.
-#[derive(Debug, Default, Clone, Serialize, Deserialize, JsonSchema, JsonRpcRequest)]
-#[request(method = "_goose/unstable/session/extensions/apply", response = EmptyResponse)]
-#[serde(rename_all = "camelCase")]
-pub struct ApplySessionExtensionsRequest {
-    pub session_id: String,
-}
-
 /// List all tools available in a session.
 #[derive(Debug, Default, Clone, Serialize, Deserialize, JsonSchema, JsonRpcRequest)]
 #[request(method = "_goose/unstable/tools/list", response = GetToolsResponse)]
@@ -1128,6 +1109,9 @@ pub struct ProviderSetupCatalogEntryDto {
     pub provider_id: String,
     pub name: String,
     pub category: ProviderSetupCategoryDto,
+    /// Whether this provider communicates through ACP.
+    #[serde(default)]
+    pub acp: bool,
     pub description: String,
     pub setup_method: ProviderSetupMethodDto,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -1697,6 +1681,26 @@ pub struct ListProvidersResponse {
     pub entries: Vec<ProviderInventoryEntryDto>,
 }
 
+/// Check whether an ACP provider can initialize and create a session.
+#[derive(Debug, Default, Clone, Serialize, Deserialize, JsonSchema, JsonRpcRequest)]
+#[request(
+    method = "_goose/unstable/providers/readiness/check",
+    response = ProviderReadinessCheckResponse
+)]
+#[serde(rename_all = "camelCase")]
+pub struct ProviderReadinessCheckRequest {
+    pub provider_id: String,
+}
+
+#[derive(Debug, Default, Clone, Serialize, Deserialize, JsonSchema, JsonRpcResponse)]
+#[serde(rename_all = "camelCase")]
+pub struct ProviderReadinessCheckResponse {
+    pub provider_id: String,
+    pub ready: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub error: Option<String>,
+}
+
 /// List the raw model identifiers returned by a provider's live supported-models API.
 #[derive(Debug, Default, Clone, Serialize, Deserialize, JsonSchema, JsonRpcRequest)]
 #[request(
@@ -1792,10 +1796,22 @@ pub struct ProviderInventoryEntryDto {
     pub default_model: String,
     /// Whether Goose has enough configuration to use this provider.
     pub configured: bool,
+    /// Whether the provider's external runtime or required configuration is available.
+    pub available: bool,
     /// Provider classification such as `Preferred`, `Builtin`, `Declarative`, or `Custom`.
     pub provider_type: String,
     /// Whether this inventory entry represents an agent provider or a model provider.
     pub category: ProviderSetupCategoryDto,
+    /// Whether this provider communicates through ACP.
+    #[serde(default)]
+    pub acp: bool,
+    /// Whether this provider should appear in normal provider setup UIs.
+    pub visible_in_setup: bool,
+    /// Whether this provider is retained only for compatibility.
+    pub deprecated: bool,
+    /// Preferred replacement for a deprecated provider.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub replacement: Option<String>,
     /// Required configuration keys and setup metadata.
     pub config_keys: Vec<ProviderConfigKey>,
     /// Step-by-step setup instructions, when present.

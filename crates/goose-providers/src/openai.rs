@@ -1362,6 +1362,7 @@ mod tests {
             setup_steps: vec![],
             fast_model: None,
             preserves_thinking: false,
+            setup: None,
         }
     }
 

@@ -194,6 +194,25 @@ impl goose_providers::base::ProviderDescriptor for LiteLLMProvider {
                 ConfigKey::new("LITELLM_TIMEOUT", false, false, Some("600"), false),
             ],
         )
+        .with_setup(
+            crate::providers::catalog::ProviderSetupMetadata::new(
+                crate::providers::catalog::ProviderSetupCategory::Model,
+                crate::providers::catalog::ProviderSetupMethod::ConfigFields,
+                crate::providers::catalog::ProviderSetupGroup::Additional,
+            )
+            .with_field(
+                "LITELLM_HOST",
+                "Host URL",
+                Some("https://your-proxy.example.com"),
+                None,
+            )
+            .with_field(
+                "LITELLM_API_KEY",
+                "API Key",
+                Some("Paste your API key"),
+                None,
+            ),
+        )
     }
 }
 
@@ -246,7 +265,8 @@ impl Provider for LiteLLMProvider {
             false,
         )?;
 
-        if self.supports_cache_control(model_config).await {
+        if !model_config.prompt_cache_disabled() && self.supports_cache_control(model_config).await
+        {
             apply_chat_payload_breakpoints(&mut payload);
         }
 
